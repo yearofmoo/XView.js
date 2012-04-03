@@ -1,0 +1,72 @@
+<!DOCTYPE html> 
+<html lang="en"> 
+<head>
+<style type="text/css">
+  .panel {
+    margin:20px 0;
+  }
+  .panel .header {
+    border:1px solid #ddd;
+    padding:1em;
+  }
+  .panel .content {
+    border:1px solid #ddd;
+    padding:1em;
+    background:#eee;
+  }
+  .panel p {
+    margin:0; padding:0;
+  }
+</style>
+</head> 
+
+<body id="" class=""> 
+  <div id="wrapper">
+    <a id="ajax" href="./ajax.html">Click here to load the ajax request</a>
+  </div>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.4.5/mootools-yui-compressed.js"></script>
+<script type="text/javascript" src="../Assets/MooTools-more.js"></script>
+<script type="text/javascript" src="../../Source/XView.js"></script>
+<script type="text/javascript">
+window.addEvent('domready',function() {
+
+  var headers = function(x) {
+    var html = '';
+    var headers = x.getHeaderNames();
+    for(var i=0;i<headers.length;i++) {
+      var header = headers[i];
+      var value = x.getHeader(header);
+      html += '<p>'+header+': <strong>'+JSON.encode(value)+'</strong></p>';
+    }
+    return html;
+  };
+
+  var parseAJAX = function(html) {
+    var x = new XView(html);
+    var html = '<div class="panel">'+
+               '  <div class="header">'+
+               '    ' + headers(x) + 
+               '  </div>'+
+               '  <div class="content">'+
+               '    ' + x.getHTML() + 
+               '  </div>'+
+               '</div>';
+    var elm = Elements.from(html);
+    elm.inject('wrapper');
+  };
+
+  $('ajax').addEvent('click',function(event) {
+    event.stop();
+
+    var request = new Request({
+      url : this.get('href'),
+      method : 'GET',
+      onSuccess : parseAJAX
+    }).send();
+
+  });
+
+});
+</script>
+</body>
+</html> 
