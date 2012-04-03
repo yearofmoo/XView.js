@@ -92,7 +92,7 @@ var XView = new Class({
   },
 
   getHeaderContent : function() {
-    return this.header;
+    return this.header || {};
   },
 
   getHeaderNames : function() {
