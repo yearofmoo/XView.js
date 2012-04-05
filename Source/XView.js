@@ -30,25 +30,29 @@ var XView = new Class({
       element = new Element('div').set('html',html);
     }
 
+    this.xviewResponse = false;
+
     try {
       this.element = element;
       if(!this.element.hasClass(this.options.rootClassName)) {
         throw new Error;
       }
 
-      var content = this.element.getElement(this.options.contentSelector); 
+      var content = this.getBlock(this.options.contentSelector); 
       if(!content) {
         throw new Error;
       }
 
       this.parseContent(content);
 
-      var header = element.getElement(this.options.headerSelector); 
+      var header = this.getBlock(this.options.headerSelector); 
       if(!header) {
         throw new Error;
       }
 
       this.parseHeader(header);
+
+      this.xviewResponse = true;
     }
     catch(e) {
       if(this.options.fallback && element) {
@@ -58,6 +62,14 @@ var XView = new Class({
         this.onFailure();
       }
     }
+  },
+
+  getBlock : function(selector) {
+    return this.getElement().getElement(selector);
+  },
+
+  getBlockHTML : function(selector) {
+    return this.getBlock(selector).get('html');
   },
 
   fallback : function(element) {
@@ -121,6 +133,10 @@ var XView = new Class({
 
   getAssets : function() {
     return this.getHeader('assets') || [];
+  },
+
+  isXViewResponse : function() {
+    return this.xviewResponse;
   },
 
   isFailure : function() {
