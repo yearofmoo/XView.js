@@ -9,8 +9,9 @@ var XView = new Class({
     headerSelector : '.xview-header'
   },
 
-  initialize : function(html) {
+  initialize : function(html,options) {
     this.html = html;
+    this.setOptions(options);
     this.parse(html);
 
     if(!Elements.from) {
