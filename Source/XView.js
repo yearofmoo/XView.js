@@ -4,9 +4,14 @@ var XView = new Class({
 
   options : {
     fallback : true,
-    rootClassName : 'xview-response',
-    contentSelector : '.xview-content',
-    headerSelector : '.xview-header'
+    parsers : ['XView','HTML'],
+    parserOptions : {
+      XView : { 
+      },
+      HTML : {
+
+      }
+    }
   },
 
   initialize : function(html,options) {
@@ -26,44 +31,24 @@ var XView = new Class({
       return;
     }
 
-    if(html.contains('<html')) {
-      this.parseHTMLPage(html);
-      return;
-    }
-
-    var element = Elements.from(html);
-    element = ['elements','array'].indexOf(typeOf(element)) >= 0 ? element[0] : element;
-    if(typeOf(element)=='null') {
-      element = new Element('div').set('html',html);
-    }
-
     this.xviewResponse = false;
 
-    try {
-      this.element = element;
-      if(!this.element.hasClass(this.options.rootClassName)) {
-        throw new Error;
+    var parsers = this.options.parsers;
+    for(var i=0;i<parsers.length;i++) {
+      try {
+        var parser = parsers[i];
+        var C = XView.Parsers[parser];
+        if(C && C.test(html)) {
+          this.runParser(parser,html);
+          break;
+        }
       }
-
-      var content = this.getBlock(this.options.contentSelector); 
-      if(!content) {
-        throw new Error;
-      }
-
-      this.parseContent(content);
-
-      var header = this.getBlock(this.options.headerSelector); 
-      if(!header) {
-        throw new Error;
-      }
-
-      this.parseHeader(header);
-
-      this.xviewResponse = true;
+      catch(e){};
     }
-    catch(e) {
-      if(this.options.fallback && element) {
-        this.fallback(element);
+
+    if(this.xviewResponse == false) {
+      if(this.options.fallback) {
+        this.fallback(html);
       }
       else {
         this.onFailure();
@@ -71,66 +56,37 @@ var XView = new Class({
     }
   },
 
-  parseHTMLPage : function(html) {
-    var contentIFrame = document.createElement('iframe');
-    contentIFrame.style.width = contentIFrame.style.height = '0px';
-    document.body.appendChild(contentIFrame);
-    var doc = contentIFrame.contentDocument ? contentIFrame.contentDocument : contentIFrame.contentWindow.document;
-    doc.open('text/html',false);
-    doc.write(html);
-    doc.close();
-
-    this.parseElementsFromTemporaryIFrame(doc,html);
-
-    var contentHTML = doc.body.innerHTML;
-    document.id(contentIFrame).destroy();
-
-    this.html = contentHTML;
-    this.content = new Element('div').set('html',contentHTML);
+  runParser : function(parser,html) {
+    var options = this.options.parserOptions[parser];
+    parser = XView.Parsers[parser];
+    parser.options = Object.append(parser.options,options);
+    var data = parser.parse(html);
+    if(data) {
+      this.parseData(data);
+    }
   },
 
-  parseElementsFromTemporaryIFrame : function(doc,html) {
-    var title = doc.title;
-    if(title) {
-      this.setHeader('title',title);
+  parseData : function(data) {
+    this.setRawHTML(data.html);
+    this.setAssets(data.assets);
+    this.setHeaders(data.headers);
+    this.setContent(data.content);
+    this.setElement(data.element);
+    this.xviewResponse = true;
+    if(data.contentHTML) {
+      this.setContentHTML(data.contentHTML);
     }
+  },
 
-    var className = doc.body.className;
-    if(className) {
-      this.setHeader('classes',className);
-    }
-
-    var id = doc.body.id;
-    if(id) {
-      this.setHeader('id',id);
-    }
-
-    doc.getElements = document.getElements.bind(doc);
-
-    var stylesheets = doc.getElements('link').map(function(link) {
-      if(link.href.length > 0 && (link.type.toLowerCase() == 'text/css' || link.rel.toLowerCase() == 'stylesheet')) {
-        return link.href;
-      }
-    }).clean();
-
-    var javascripts = [];
-    var matches = html.match(/<script.+?>/g);
-    if(matches) {
-      for(var i=0;i<matches.length;i++) {
-        var attr = matches[i].match(/<script.+?src\s*=\s*['"]?(.+?)['"\s]/);
-        if(attr) {
-          var src = attr[1];
-          if(src.length > 0) {
-            javascripts.push(src);
-          }
-        }
-      }
-    }
-
-    if(javascripts.length > 0 || stylesheets.length > 0) {
-      var assets = [].concat(javascripts).concat(stylesheets);
-      this.setAssets(assets);
-    }
+  fallback : function(html) {
+    var content = new Element('div').set('html',html);
+    this.parseData({
+      content : content,
+      element : content,
+      headers : {},
+      assets : [],
+      html : html
+    });
   },
 
   getBlock : function(selector) {
@@ -141,26 +97,23 @@ var XView = new Class({
     return this.getBlock(selector).get('html');
   },
 
-  fallback : function(element) {
-    this.content = element;
-    this.header = {};
-  },
-
   getElement : function() {
     return this.element;
   },
 
-  parseContent : function(content) {
+  setElement : function(element) {
+    this.element = element;
+  },
+
+  setContent : function(content) {
     this.content = content;
     if(this.options.scope) {
       this.content = this.getContentScope(this.options.scope);  
     }
   },
 
-  parseHeader : function(header) {
-    var content = header.get('html').trim();
-    this.header = JSON.decode(content);
-    header.destroy();
+  setRawHTML : function(html) {
+    this.html = html;
   },
 
   getRawHTML : function() {
@@ -173,6 +126,17 @@ var XView = new Class({
 
   getContent : function() {
     return this.content;
+  },
+
+  getContentHTML : function() {
+    if(!this.contentHTML) {
+      this.contentHTML = this.getContent().get('html');
+    }
+    return this.contentHTML;
+  },
+
+  setContentHTML : function(html) {
+    this.contentHTML = html;
   },
 
   getContentScope : function(selector) {
@@ -199,6 +163,12 @@ var XView = new Class({
     this.getHeaderContent()[header]=value;
   },
 
+  setHeaders : function(headers) {
+    for(var i in headers) {
+      this.setHeader(i,headers[i]);
+    }
+  },
+
   getPageID : function() {
     return this.getHeader('id');
   },
@@ -216,7 +186,7 @@ var XView = new Class({
   },
 
   setAssets : function(assets) {
-    this.setHeader('assets',assets);
+    return this.setHeader('assets',assets);
   },
 
   isXViewResponse : function() {
@@ -245,9 +215,142 @@ var XView = new Class({
 
   destroy : function() {
     try {
+      this.getContent().destroy();
       this.getElement().destroy();
     }
     catch(e) {}
   }
 
 });
+
+XView.Parsers = {};
+
+XView.Parsers.XView = {
+
+  options : {
+    rootClassName : 'xview-response',
+    contentClassName : 'xview-content',
+    headerClassName : 'xview-header',
+  },
+
+  test : function(html) {
+    var element = this.parseToElement(html);
+    return element && element.hasClass(this.options.rootClassName);
+  },
+
+  parseToElement : function(html) {
+    var element = Elements.from(html);
+    element = ['elements','array'].indexOf(typeOf(element)) >= 0 ? element[0] : element;
+    return element;
+  },
+
+  parse : function(html) {
+    var element = this.parseToElement(html);
+    var contentClass = this.options.contentClassName;
+    var headerClass = this.options.headerClassName;
+    var content = element.getElement('.'+contentClass);
+    var header = element.getElement('.'+headerClass);
+    var headerData = JSON.decode(header.get('html'));
+    var assets = headerData['assets'] || [];
+    delete headerData['assets'];
+    return {
+      raw : html,
+      element : element,
+      content : content,
+      headers : headerData,
+      assets : assets
+    };
+  },
+
+};
+
+XView.Parsers.HTML = {
+
+  test : function(html) {
+    return html.contains('<html');
+  },
+
+  parse : function(html) {
+    var iframe = this.createTemporaryIFrame(html);
+    var doc = iframe.contentDocument ? iframe.contentDocument : iframe.contentWindow.document;
+    var content = this.createContent(doc, html);
+    var data = {
+      raw : html,
+      element : content,
+      content : content,
+      assets : this.parseAssets(doc, html),
+      headers : this.parseHeaders(doc, html)
+    };
+
+    document.id(iframe).destroy();
+    return data;
+  },
+
+  createContent : function(doc, html) {
+    return new Element('div').set('html',doc.body.innerHTML);
+  },
+
+  createTemporaryIFrame : function(html) {
+    var contentIFrame = document.createElement('iframe');
+    contentIFrame.style.width = contentIFrame.style.height = '0px';
+    document.body.appendChild(contentIFrame);
+    var doc = contentIFrame.contentDocument ? contentIFrame.contentDocument : contentIFrame.contentWindow.document;
+    doc.open('text/html',false);
+    doc.write(html);
+    doc.close();
+    return contentIFrame;
+  },
+
+  parseHeaders : function(doc, html) {
+    var headers = {};
+    var title = doc.title;
+    if(title) {
+      headers['title']=title; 
+    }
+
+    var className = doc.body.className;
+    if(className) {
+      headers['className']=className;
+    }
+
+    var id = doc.body.id;
+    if(id) {
+      headers['id']=id;
+    }
+
+    return headers;
+  },
+
+  parseAssets : function(doc, html) {
+    doc.getElements = document.getElements.bind(doc);
+
+    var assets = [];
+
+    var stylesheets = doc.getElements('link').map(function(link) {
+      if(link.href.length > 0 && (link.type.toLowerCase() == 'text/css' || link.rel.toLowerCase() == 'stylesheet')) {
+        return link.href;
+      }
+    }).clean();
+
+    var javascripts = [];
+    var matches = html.match(/<script.+?>/g);
+    if(matches) {
+      for(var i=0;i<matches.length;i++) {
+        var attr = matches[i].match(/<script.+?src\s*=\s*['"]?(.+?)['"\s]/);
+        if(attr) {
+          var src = attr[1];
+          if(src.length > 0) {
+            javascripts.push(src);
+          }
+        }
+      }
+    }
+
+    if(javascripts.length > 0 || stylesheets.length > 0) {
+      assets = [].concat(javascripts).concat(stylesheets);
+    }
+
+    return assets;
+  }
+
+};
