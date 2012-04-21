@@ -10,6 +10,7 @@ var XView = new Class({
   },
 
   initialize : function(html,options) {
+    this.header = {};
     this.html = html;
     this.setOptions(options);
     this.parse(html);
@@ -22,6 +23,11 @@ var XView = new Class({
   parse : function(html) {
     if(!html || typeOf(html) != 'string' || html.length == 0) {
       this.onEmpty();
+      return;
+    }
+
+    if(html.contains('<html')) {
+      this.parseHTMLPage(html);
       return;
     }
 
@@ -65,6 +71,68 @@ var XView = new Class({
     }
   },
 
+  parseHTMLPage : function(html) {
+    var contentIFrame = document.createElement('iframe');
+    contentIFrame.style.width = contentIFrame.style.height = '0px';
+    document.body.appendChild(contentIFrame);
+    var doc = contentIFrame.contentDocument ? contentIFrame.contentDocument : contentIFrame.contentWindow.document;
+    doc.open('text/html',false);
+    doc.write(html);
+    doc.close();
+
+    this.parseElementsFromTemporaryIFrame(doc,html);
+
+    var contentHTML = doc.body.innerHTML;
+    document.id(contentIFrame).destroy();
+
+    this.html = contentHTML;
+    this.content = new Element('div').set('html',contentHTML);
+  },
+
+  parseElementsFromTemporaryIFrame : function(doc,html) {
+    var title = doc.title;
+    if(title) {
+      this.setHeader('title',title);
+    }
+
+    var className = doc.body.className;
+    if(className) {
+      this.setHeader('classes',className);
+    }
+
+    var id = doc.body.id;
+    if(id) {
+      this.setHeader('id',id);
+    }
+
+    doc.getElements = document.getElements.bind(doc);
+
+    var stylesheets = doc.getElements('link').map(function(link) {
+      if(link.href.length > 0 && (link.type.toLowerCase() == 'text/css' || link.rel.toLowerCase() == 'stylesheet')) {
+        return link.href;
+      }
+    }).clean();
+
+    var javascripts = [];
+    var matches = html.match(/<script.+?>/g);
+    if(matches) {
+      for(var i=0;i<matches.length;i++) {
+        var attr = matches[i].match(/<script.+?src\s*=\s*['"]?(.+?)['"\s]/);
+        if(attr) {
+          var src = attr[1];
+          if(src.length > 0) {
+            javascripts.push(src);
+          }
+        }
+      }
+    }
+
+    if(javascripts.length > 0 || stylesheets.length > 0) {
+      var assets = [].concat(javascripts).concat(stylesheets);
+      this.setAssets(assets);
+    }
+  },
+
   getBlock : function(selector) {
     return this.getElement().getElement(selector);
   },
@@ -83,7 +151,10 @@ var XView = new Class({
   },
 
   parseContent : function(content) {
-    return this.content = content;
+    this.content = content;
+    if(this.options.scope) {
+      this.content = this.getContentScope(this.options.scope);  
+    }
   },
 
   parseHeader : function(header) {
@@ -104,6 +175,10 @@ var XView = new Class({
     return this.content;
   },
 
+  getContentScope : function(selector) {
+    return this.getContent().getElement(selector);
+  },
+
   getHeaderContent : function() {
     return this.header || {};
   },
@@ -120,6 +195,10 @@ var XView = new Class({
     return this.getHeaderContent()[header];
   },
 
+  setHeader : function(header,value) {
+    this.getHeaderContent()[header]=value;
+  },
+
   getPageID : function() {
     return this.getHeader('id');
   },
@@ -134,6 +213,10 @@ var XView = new Class({
 
   getAssets : function() {
     return this.getHeader('assets') || [];
+  },
+
+  setAssets : function(assets) {
+    this.setHeader('assets',assets);
   },
 
   isXViewResponse : function() {

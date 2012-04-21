@@ -1,5 +1,6 @@
 <!DOCTYPE html> 
 <html lang="en"> 
+<link rel="stylesheet" type="text/css" href="..." />
 <head>
 <style type="text/css">
   .panel {
@@ -23,6 +24,7 @@
 <body id="" class=""> 
   <div id="wrapper">
     <a id="ajax" href="./ajax.html">Click here to load the ajax request</a>
+    <a id="normal" href="./normal.html?112323123">Click here to load a standard HTML page (scopes to the body)</a>
   </div>
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.4.5/mootools-yui-compressed.js"></script>
 <script type="text/javascript" src="../Assets/MooTools-more.js"></script>
@@ -63,6 +65,21 @@ window.addEvent('domready',function() {
       method : 'GET',
       onSuccess : parseAJAX
     }).send();
+
+  });
+
+  $('normal').addEvent('click',function(event) {
+    event.stop();
+
+    var request = new Request({
+      url : this.get('href'),
+      method : 'GET',
+      onSuccess : parseAJAX
+    });
+    request.processScripts = function(text) {
+      return text;
+    };
+    request.send();
 
   });
 
