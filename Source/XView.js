@@ -250,7 +250,12 @@ XView.Parsers.XView = {
     var headerClass = this.options.headerClassName;
     var content = element.getElement('.'+contentClass);
     var header = element.getElement('.'+headerClass);
-    var headerData = JSON.decode(header.get('html'));
+    var headerText = (header.get('html') || '').trim();
+    var headerData;
+    if(headerText.length > 0 && headerText.charAt(0) == '{') {
+      headerData = JSON.decode(headerText);
+    }
+    headerData = typeOf(headerData) == 'object' ? headerData : {};
     var assets = headerData['assets'] || [];
     delete headerData['assets'];
     return {
